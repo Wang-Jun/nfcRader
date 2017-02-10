@@ -192,8 +192,8 @@ public class PbocCard {
 				final int cash = Util.toInt(v, 5, 4);
 				if (cash > 0) {
 					date=String.format("%02X%02X.%02X.%02X",
-									v[16], v[17], v[18], v[19], v[20]);
-					time=String.format("%02X:%02X",v[21],v[22]);
+									v[16], v[17], v[18], v[19]);
+					time=String.format("%02X:%02X:%02X",v[20],v[21],v[22]);
 
 					final char t = (v[9] == TRANS_CSU || v[9] == TRANS_CSU_CPX) ? '-'
 							: '+';
