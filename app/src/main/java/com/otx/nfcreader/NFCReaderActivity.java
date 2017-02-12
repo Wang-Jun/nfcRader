@@ -9,6 +9,8 @@ import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.nfc.NfcAdapter;
+import android.nfc.Tag;
+import android.nfc.tech.NfcA;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.support.v4.widget.SwipeRefreshLayout;
@@ -28,7 +30,10 @@ import com.otx.nfcreader.card.Result;
 import com.otx.nfcreader.card.pboc.PbocCard;
 import com.otx.nfcreader.card.OctopusCard;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * Created by wangjun on 2017/2/10.
@@ -170,8 +175,91 @@ public class NFCReaderActivity extends AppCompatActivity  {
         Log.d("NFCTAG", intent.getAction());
         //TODO:
         if(p!=null) {
+            //resolveIntentNfcA(intent);
             Result result=CardManager.load(p, res);
             updateView(result);
+        }
+    }
+
+    private String gb2312ToString(byte[] data) {
+        String str = null;
+        try {
+            str = new String(data, "gb2312");//"utf-8"
+        } catch (UnsupportedEncodingException e) {
+        }
+        return str;
+    }
+
+
+    private static final String TAG = "NfcA Read";
+
+    private static boolean READ_LOCK = false;
+
+    private void resolveIntentNfcA(Intent intent) {
+        if (READ_LOCK==false){
+            READ_LOCK = true;
+            Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+
+            if (NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction()))
+            {
+                Tag tagFromIntent = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+                Log.i(TAG, Arrays.toString(tagFromIntent.getTechList()));
+
+                try
+                {
+                    NfcA nfcA = NfcA.get(tag);
+                    nfcA.connect();
+                    Log.e(TAG,"connected");
+                    byte[] cmd=new byte[]{(byte) 0x60,(byte) 0x08,(byte) 0xff,(byte) 0xff,(byte) 0xff,(byte) 0xff,(byte) 0xff,(byte) 0xff};
+
+                    byte[] result = nfcA.transceive(cmd);
+                    int data_len = ((result[0]&0x0f)<<8)+((result[1]&0xff));
+                    Log.e(TAG, "是否已写入数据"+result[0]+"，写入数据长度："+data_len);
+                    byte[] buf_res = new byte[data_len/2+4];
+                    if (result[0]!=0 && data_len!=0){
+                        int count = data_len/2/64;
+                        int i = 0;
+                        for (i=0; i<count; i++){
+//                      //读取数据
+                            byte[] DATA_READ = {
+                                    (byte) 0x3A,
+                                    (byte) (0x06+i*(64/4)),
+                                    (byte) (0x06+(i+1)*(64/4))
+//                              (byte) (5+data_len/8)
+                            };
+                            byte[] data_res = nfcA.transceive(DATA_READ);
+                            System.arraycopy(data_res, 0, buf_res, i*64, 64);
+                            Log.e(TAG, "读卡成功");
+                        }
+                        if (((data_len/2)%(64))!=0){
+                            byte[]DATA_READ = {
+                                    (byte) 0x3A,
+                                    (byte) (0x06+i*(64/4)),
+                                    (byte) (((0x06+i*(64/4))+(data_len/2/4)%(64/4))-1)
+//                              (byte) (5+data_len/8)
+                            };
+                            byte[] data_res = nfcA.transceive(DATA_READ);
+                            System.arraycopy(data_res, 0, buf_res, i*64, (data_len/2)%64);
+                            Log.e(TAG, "读卡成功2");
+                        }
+                        String res = gb2312ToString(buf_res);
+                        Log.e(TAG, "stringBytes:"+res);
+                    }
+
+
+                }catch(IOException e){
+                    e.printStackTrace();
+                    Log.e(TAG, "读卡失败");
+                }catch (Exception e) {
+                    // TODO: handle exception
+                    e.printStackTrace();
+                    Log.e("NFC TYPE ERROR","  ");
+                }finally{
+
+                }
+
+            }
+            READ_LOCK = false;
         }
     }
 
@@ -179,7 +267,8 @@ public class NFCReaderActivity extends AppCompatActivity  {
         if(result==null) return;
         if(result.getType()== Result.CardType.OctopusCard){
             OctopusCard p=(OctopusCard) result.getRes();
-            CardType.setText(p.getCardName());
+            if(p==null) return;
+            CardType.setText(p.getCardName()+"");
             Balance.setText("余额:"+p.getCardCash()+"港币");
             CardId.setText("标识:"+p.getCardId());
             CardVersion.setText("参数:"+p.getCardPm());
@@ -192,7 +281,8 @@ public class NFCReaderActivity extends AppCompatActivity  {
         }
         if(result.getType()== Result.CardType.PbocCard){
             PbocCard p=(PbocCard) result.getRes();
-            CardType.setText(p.getCardName());
+            if(p==null)return;
+            CardType.setText(p.getCardName()+"");
             Balance.setText("余额:"+p.getCardCash()+"元");
             CardId.setText("卡号:"+p.getCardSerl());
             CardVersion.setText("版本:"+p.getCardVersion());

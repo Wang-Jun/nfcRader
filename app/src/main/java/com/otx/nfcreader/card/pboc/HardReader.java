@@ -130,7 +130,7 @@ final class HardReader extends PbocCard {
 			return null;
 
 		final Iso7816.Response rsp = tag.selectByName(aid);
-		if (!rsp.isOkey())
+		if (!rsp.isOkey()||rsp.getBytes().length==0)
 			return null;
 
 		Iso7816.BerTLV tlv = Iso7816.BerTLV.read(rsp);

@@ -114,6 +114,7 @@ public class PbocCard {
 
 		} while (false);
 
+		//如果在BeijingMunicipal中取消了search aid的注释的话，这里不要进行tag.close(),将下面一行注释掉，tag.close()会由search aid 线程调用
 		tag.close();
 
 		return card;
